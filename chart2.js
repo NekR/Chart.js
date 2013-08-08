@@ -4,7 +4,9 @@
     floor = Math.floor,
     round = Math.round,
     sin = Math.sin,
-    cos = Math.cos;
+    cos = Math.cos,
+    ceil = Math.ceil,
+    pow = Math.pow;
 
   var calculateOffset = function(val, calculatedScale, scaleHop) {
     var outerValue = calculatedScale.steps * calculatedScale.stepValue,
@@ -70,6 +72,9 @@
     
     requestAnimationFrame(animLoop);
   },
+  calculateOrderOfMagnitude = function(val) {
+    return floor(Math.log(val) / Math.LN10);
+  },
   calculateScale = function(
     drawingHeight,
     maxSteps,
@@ -86,18 +91,14 @@
       valueRange,
       rangeOrderOfMagnitude,
       decimalNum;
-
-    var calculateOrderOfMagnitude = function(val) {
-      return floor(Math.log(val) / Math.LN10);
-    };
     
     valueRange = maxValue - minValue;
     
     rangeOrderOfMagnitude = calculateOrderOfMagnitude(valueRange);
-    graphMin = floor(minValue / (1 * Math.pow(10, rangeOrderOfMagnitude))) * Math.pow(10, rangeOrderOfMagnitude);
-    graphMax = Math.ceil(maxValue / (1 * Math.pow(10, rangeOrderOfMagnitude))) * Math.pow(10, rangeOrderOfMagnitude);
+    stepValue = pow(10, rangeOrderOfMagnitude);
+    graphMin = floor(minValue / stepValue) * stepValue;
+    graphMax = ceil(maxValue / stepValue) * stepValue;
     graphRange = graphMax - graphMin;
-    stepValue = Math.pow(10, rangeOrderOfMagnitude);
     numberOfSteps = round(graphRange / stepValue);
 
     // Compare number of steps to the max and min for that size graph,
@@ -270,9 +271,9 @@
       return 1 / 2 * Math.sqrt(1 - (t -= 2) * t) + 1;
     },
     easeInElastic: function(t) {
-      var s = 1.70158;
-      var p;
-      var a = 1;
+      var s = 1.70158,
+        p,
+        a = 1;
 
       if (!t || t === 1) return t;
       p = 1 * 0.3;
@@ -287,10 +288,10 @@
       return -(a * Math.pow(2, 10 * (t -= 1)) *
         sin((t * 1 - s) * (2 * Math.PI) / p));
     },
-    easeOutElastic: function (t) {
-      var s = 1.70158;
-      var p;
-      var a = 1;
+    easeOutElastic: function(t) {
+      var s = 1.70158,
+        p,
+        a = 1;
 
       if (!t || t === 1) return t;
       p = 1 * 0.3;
@@ -306,44 +307,64 @@
       return a * Math.pow(2, -10 * t) *
         sin((t * 1 - s) * (2 * Math.PI) / p) + 1;
     },
-    easeInOutElastic: function (t) {
-      var s=1.70158;var p=0;var a=1;
-      if (t==0) return 0;  if ((t/=1/2)==2) return 1;  if (!p) p=1*(.3*1.5);
-      if (a < Math.abs(1)) { a=1; var s=p/4; }
-      else var s = p/(2*Math.PI) * Math.asin (1/a);
-      if (t < 1) return -.5*(a*Math.pow(2,10*(t-=1)) * Math.sin( (t*1-s)*(2*Math.PI)/p ));
-      return a*Math.pow(2,-10*(t-=1)) * Math.sin( (t*1-s)*(2*Math.PI)/p )*.5 + 1;
+    easeInOutElastic: function(t) {
+      var s = 1.70158,
+        p,
+        a = 1;
+
+      if (!t || t === 1) return t;
+      p = 1 * (0.3 * 1.5);
+
+      /*if (a < 1) {
+        a = 1;
+        s = p / 4;
+      } else {*/
+        s = p / (2 * Math.PI) * Math.asin(1 / a);
+      //}
+
+      if (t < 1) {
+        return -0.5 * (a * Math.pow(2, 10 * (t -= 1)) * sin((t * 1 - s) * (2 * Math.PI) / p));
+      }
+
+      return a * Math.pow(2, -10 * (t -= 1)) * sin((t * 1 - s) * (2 * Math.PI) / p) * 0.5 + 1;
     },
-    easeInBack: function (t) {
+    easeInBack: function(t) {
       var s = 1.70158;
       return 1*(t/=1)*t*((s+1)*t - s);
     },
-    easeOutBack: function (t) {
+    easeOutBack: function(t) {
       var s = 1.70158;
       return 1*((t=t/1-1)*t*((s+1)*t + s) + 1);
     },
-    easeInOutBack: function (t) {
+    easeInOutBack: function(t) {
       var s = 1.70158; 
-      if ((t/=1/2) < 1) return 1/2*(t*t*(((s*=(1.525))+1)*t - s));
-      return 1/2*((t-=2)*t*(((s*=(1.525))+1)*t + s) + 2);
+
+      if ((t /= 1 / 2) < 1) {
+        return 1 / 2 * (t * t * (((s *= (1.525)) + 1) * t - s));
+      }
+
+      return 1 / 2 * ((t -= 2) * t * (((s *= (1.525)) + 1) * t + s) + 2);
     },
-    easeInBounce: function (t) {
-      return 1 - animationOptions.easeOutBounce (1-t);
+    easeInBounce: function(t) {
+      return 1 - animationOptions.easeOutBounce (1 - t);
     },
-    easeOutBounce: function (t) {
-      if ((t/=1) < (1/2.75)) {
-        return 1*(7.5625*t*t);
-      } else if (t < (2/2.75)) {
-        return 1*(7.5625*(t-=(1.5/2.75))*t + .75);
-      } else if (t < (2.5/2.75)) {
-        return 1*(7.5625*(t-=(2.25/2.75))*t + .9375);
+    easeOutBounce: function(t) {
+      if ((t /= 1) < 1 / 2.75) {
+        return 1 * (7.5625 * t * t);
+      } else if (t < (2 / 2.75)) {
+        return 1 * (7.5625 * (t -= (1.5 / 2.75)) * t + 0.75);
+      } else if (t < (2.5 / 2.75)) {
+        return 1 * (7.5625 * (t -= (2.25 / 2.75)) * t + 0.9375);
       } else {
-        return 1*(7.5625*(t-=(2.625/2.75))*t + .984375);
+        return 1 * (7.5625 * (t -= (2.625 / 2.75)) * t + 0.984375);
       }
     },
-    easeInOutBounce: function (t) {
-      if (t < 1/2) return animationOptions.easeInBounce (t*2) * .5;
-      return animationOptions.easeOutBounce (t*2-1) * .5 + 1*.5;
+    easeInOutBounce: function(t) {
+      if (t < 1 / 2) {
+        return animationOptions.easeInBounce(t * 2) * 0.5;
+      }
+
+      return animationOptions.easeOutBounce(t * 2 - 1) * 0.5 + 1 * 0.5;
     }
   },
   charts = {};
@@ -383,33 +404,38 @@
 
   var defaults = {
     line: {
-      scaleOverlay : false,
-      scaleOverride : false,
-      scaleSteps : null,
-      scaleStepWidth : null,
-      scaleStartValue : null,
-      scaleLineColor : "rgba(0,0,0,.1)",
-      scaleLineWidth : 1,
-      scaleShowLabels : true,
-      scaleLabel : "<%=value%>",
-      scaleFontFamily : "'Arial'",
-      scaleFontSize : 12,
-      scaleFontStyle : "normal",
-      scaleFontColor : "#666",
-      scaleShowGridLines : true,
-      scaleGridLineColor : "rgba(0,0,0,.05)",
-      scaleGridLineWidth : 1,
-      bezierCurve : true,
-      pointDot : true,
-      pointDotRadius : 4,
-      pointDotStrokeWidth : 2,
-      datasetStroke : true,
-      datasetStrokeWidth : 2,
-      datasetFill : true,
-      animation : true,
-      animationSteps : 60,
-      animationEasing : "easeOutQuart",
-      onAnimationComplete : null
+      scaleOverlay: false,
+      scaleOverride: false,
+      scaleSteps: null,
+      scaleStepWidth: null,
+      scaleStartValue: null,
+      scaleLineColor: 'rgba(0, 0, 0, 0.1)',
+      scaleLineWidth: 1,
+      scaleShowLabels: true,
+      scaleLabel: '<%=value%>',
+      scaleFontFamily: 'Arial',
+      scaleFontSize: 12,
+      scaleFontStyle: 'normal',
+      scaleFontColor: '#666',
+      scaleShowGridLines: true,
+      scaleGridLineColor: 'rgba(0, 0, 0, .05)',
+      scaleGridLineWidth: 1,
+
+      bezierCurve: true,
+      pointDot: true,
+      pointDotRadius: 4,
+      pointDotStrokeWidth: 2,
+
+      datasetStroke: true,
+      datasetStrokeWidth: 2,
+      datasetFill: true,
+
+      animation: true,
+      animationSteps: 60, 
+      animationEasing: 'easeOutQuart',
+      onAnimationComplete: null,
+
+      area: 'stacked'
     }
   };
 
@@ -439,7 +465,8 @@
       rotateLabels = 0,
       gl = chart.context,
       width = chart.width,
-      height = chart.height;
+      height = chart.height,
+      stacked = true;
 
     var drawLines = function(animPc) {
       var i = 0,
@@ -447,27 +474,37 @@
         len = datasets.length,
         item,
         itemData,
-        itemLen;
+        itemLen,
+        stack = [],
+        stackedVal;
 
       var yPos = function(iteration) {
-        return xAxisPosY - animPc * calculateOffset(itemData[iteration], calculatedScale, scaleHop);
+        var res = xAxisPosY - animPc * calculateOffset(
+          itemData[iteration],
+          calculatedScale,
+          scaleHop
+        );
+
+        return res;
       },
       xPos = function(iteration) {
         return yAxisPosX + (valueHop * iteration);
       };
 
       for (; i < len; i++) {
+        updateOffsetTop = updateOffsetLeft = 0;
         item = datasets[i];
         itemData = item.data;
         itemLen = itemData.length;
+        stackedVal = stack[0] || 0;
 
         gl.strokeStyle = item.strokeColor;
         gl.lineWidth = config.datasetStrokeWidth;
         gl.beginPath();
         gl.moveTo(
           yAxisPosX,
-          xAxisPosY - animPc *
-            calculateOffset(itemData[0], calculatedScale, scaleHop)
+          xAxisPosY -
+            animPc * calculateOffset(itemData[0], calculatedScale, scaleHop)
         );
 
         var j = 1;
@@ -483,7 +520,7 @@
               yPos(j)
             );
           } else {
-            gl.lineTo(xPos(j), yPos(i,j));
+            gl.lineTo(xPos(j), yPos(j));
           }
         }
 
@@ -521,6 +558,10 @@
             gl.fill();
             gl.stroke();
           }
+        }
+
+        if (stacked) {
+          
         }
       }
     },
@@ -670,7 +711,7 @@
 
         if (width / len < cos(rotateLabels) * widestXLabel) {
           rotateLabels = 90;
-          maxSize -= widestXLabel; 
+          maxSize -= widestXLabel;
         } else {
           maxSize -= sin(rotateLabels) * widestXLabel;
         }
@@ -691,35 +732,39 @@
     getValueBounds = function() {
       var upperValue = Number.MIN_VALUE,
         lowerValue = Number.MAX_VALUE,
-        i = 0,
+        i,
         datasets = data.datasets,
         len = datasets.length,
-        j = 0,
+        j,
         item,
         itemData,
         itemLen,
-        deepItem;
+        dataVal;
 
-      for (; i < len; i++) {
+      for (i = 0; i < len; i++) {
         item = datasets[i];
         itemData = item.data;
         itemLen = itemData.length;
 
-        for (; j < itemLen; j++) {
-          deepItem = itemData[j];
+        for (j = 0; j < itemLen; j++) {
+          dataVal = itemData[j];
 
-          if (deepItem > upperValue) {
-            upperValue = deepItem;
+          if (dataVal > upperValue) {
+            if (stacked) {
+              upperValue = i ? upperValue + dataVal : dataVal;
+            } else {
+              upperValue = dataVal;
+            }
           }
 
-          if (deepItem < lowerValue) {
-            lowerValue = deepItem;
+          if (dataVal < lowerValue) {
+            lowerValue = dataVal;
           }
         }
       }
     
       var maxSteps = floor(scaleHeight / (labelHeight * 0.66)),
-        minSteps = Math.floor(scaleHeight / labelHeight * 0.5);
+        minSteps =  floor(scaleHeight / labelHeight * 0.5);
       
       return {
         maxValue: upperValue,
@@ -733,7 +778,7 @@
     valueBounds = getValueBounds();
 
     // Check and set the scale
-    labelTemplateString = (config.scaleShowLabels)? config.scaleLabel : '';
+    labelTemplateString = (config.scaleShowLabels) ? config.scaleLabel : '';
 
     if (!config.scaleOverride) {
       calculatedScale = calculateScale(
@@ -744,6 +789,8 @@
         valueBounds.minValue,
         labelTemplateString
       );
+
+      console.log(calculatedScale);
     } else {
       calculatedScale = {
         steps: config.scaleSteps,

@@ -28,5 +28,16 @@
 
 	var test = document.getElementById('test'),
 		chart = new Chart(test),
-		line = chart.create('line', data);
+		line = chart.create('line', data, {
+			bezierCurve: false,
+			animation: false
+		});
+	
+	/*var test = document.getElementById('test'),
+		ctx = test.getContext('2d');
+
+	new Chart(ctx).Line(data, {
+			bezierCurve: false,
+			animation: false
+		});*/
 </script>
