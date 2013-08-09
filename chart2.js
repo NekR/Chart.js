@@ -6,7 +6,8 @@
     sin = Math.sin,
     cos = Math.cos,
     ceil = Math.ceil,
-    pow = Math.pow;
+    pow = Math.pow,
+    abs = Math.abs;
 
   var calculateOffset = function(val, calculatedScale, scaleHop) {
     var outerValue = calculatedScale.steps * calculatedScale.stepValue,
@@ -372,10 +373,28 @@
   var Chart = function(canvas) {
     var chart = this,
       self = this,
+      context,
+      width,
+      height,
+      ratio,
+      options;
+
+    if (canvas.nodeType === Node.ELEMENT_NODE) {
       context = canvas.getContext('2d'),
       width = canvas.width,
       height = canvas.height,
       ratio;
+    } else {
+      options = canvas;
+      canvas = document.createElement('canvas');
+      context= canvas.getContext('2d');
+      width = options.width;
+      height = options.height;
+
+      canvas.width = width;
+      canvas.height = height;
+      options.target.appendChild(canvas);
+    }
 
     this.context = context;
     this.canvas = canvas;
@@ -433,9 +452,7 @@
       animation: true,
       animationSteps: 60, 
       animationEasing: 'easeOutQuart',
-      onAnimationComplete: null,
-
-      area: 'stacked'
+      onAnimationComplete: null
     }
   };
 
@@ -466,7 +483,7 @@
       gl = chart.context,
       width = chart.width,
       height = chart.height,
-      stacked = true;
+      stacked = config.area === 'stacked';
 
     var drawLines = function(animPc) {
       var i = 0,
@@ -474,9 +491,7 @@
         len = datasets.length,
         item,
         itemData,
-        itemLen,
-        stack = [],
-        stackedVal;
+        itemLen;
 
       var yPos = function(iteration) {
         var res = xAxisPosY - animPc * calculateOffset(
@@ -496,7 +511,6 @@
         item = datasets[i];
         itemData = item.data;
         itemLen = itemData.length;
-        stackedVal = stack[0] || 0;
 
         gl.strokeStyle = item.strokeColor;
         gl.lineWidth = config.datasetStrokeWidth;
@@ -559,10 +573,129 @@
             gl.stroke();
           }
         }
+      }
+    },
+    drawStackedLines = function(animPc) {
+      var i = 0,
+        datasets = data.datasets,
+        len = datasets.length,
+        item,
+        itemData,
+        itemLen,
+        stack = [],
+        newStack = [];
 
-        if (stacked) {
-          
+      var yPos = function(index, noStack) {
+        var size = animPc * calculateOffset(
+          itemData[index],
+          calculatedScale,
+          scaleHop
+        );
+
+        if (!noStack) {
+          var stackedVal = stack[index] || 0;
+          stackedVal /*= stack[index]*/ = size + stackedVal;
+          newStack.push(stackedVal);
+          size = xAxisPosY - stackedVal;
+        } else {
+          size = xAxisPosY - size;
         }
+
+
+        return size
+      },
+      xPos = function(index) {
+        return yAxisPosX + (valueHop * index);
+      };
+
+      for (; i < len; i++) {
+        updateOffsetTop = updateOffsetLeft = 0;
+        item = datasets[i];
+        itemData = item.data;
+        itemLen = itemData.length;
+        stackedVal = stack[0] || 0;
+
+        gl.strokeStyle = item.strokeColor;
+        gl.lineWidth = config.datasetStrokeWidth;
+        gl.beginPath();
+        gl.moveTo(yAxisPosX, yPos(0));
+
+        var j = 1;
+
+        if (stack.length < itemLen) {
+          stack.length = itemLen;
+        }
+
+        for (; j < itemLen; j++) {
+          // not supported now
+          if (config.bezierCurve && false) {
+            gl.bezierCurveTo(
+              // control 1
+              xPos(j - 0.5),
+              yPos(j - 1, true),
+
+              // control 2
+              xPos(j - 0.5),
+              yPos(j, true),
+
+              // end
+              xPos(j),
+              yPos(j)
+            );
+          } else {
+            gl.lineTo(xPos(j), yPos(j));
+          }
+        }
+
+        gl.stroke();
+
+        if (config.datasetFill) {
+          stack.reverse();
+
+          var g = 0,
+            stackLen = stack.length,
+            stackedVal;
+
+          for (; g < stackLen; g++) {
+            stackedVal = stack[g];
+
+            gl.lineTo(xPos(stack.length - (g + 1)), xAxisPosY - (stackedVal || 0));
+          }
+
+          gl.closePath();
+          gl.fillStyle = item.fillColor;
+          gl.fill();
+        } else {
+          gl.closePath();
+        }
+
+        if (config.pointDot) {
+          gl.fillStyle = item.pointColor;
+          gl.strokeStyle = item.pointStrokeColor;
+          gl.lineWidth = config.pointDotStrokeWidth;
+
+          stack.reverse();
+
+          var k = 0;
+
+          for (; k < itemLen; k++) {
+            gl.beginPath();
+            gl.arc(
+              xPos(k),
+              xAxisPosY - ((newStack[k] || 0)),
+              config.pointDotRadius,
+              0,
+              Math.PI * 2,
+              true
+            );
+
+            gl.fill();
+            gl.stroke();
+          }
+        }
+
+        stack = newStack;
+        newStack = [];
       }
     },
     drawScale = function() {
@@ -730,16 +863,19 @@
       scaleHeight = maxSize;
     },
     getValueBounds = function() {
-      var upperValue = Number.MIN_VALUE,
-        lowerValue = Number.MAX_VALUE,
+      var upperValue = 0,
+        lowerValue = 0,
         i,
+        j,
         datasets = data.datasets,
         len = datasets.length,
-        j,
         item,
         itemData,
         itemLen,
-        dataVal;
+        dataVal,
+        minArr = [Number.MAX_VALUE], // 0 for value from 0
+        maxArr = [Number.MIN_VALUE],
+        arrVal;
 
       for (i = 0; i < len; i++) {
         item = datasets[i];
@@ -749,19 +885,28 @@
         for (j = 0; j < itemLen; j++) {
           dataVal = itemData[j];
 
-          if (dataVal > upperValue) {
-            if (stacked) {
-              upperValue = i ? upperValue + dataVal : dataVal;
-            } else {
-              upperValue = dataVal;
-            }
+          arrVal = minArr[j] || 0;
+
+          if (!stacked && dataVal < arrVal) {
+            minArr[j] = dataVal;
           }
 
-          if (dataVal < lowerValue) {
-            lowerValue = dataVal;
+          arrVal = maxArr[j] || 0;
+
+          if (stacked) {
+            maxArr[j] = arrVal + dataVal;
+          } else if (dataVal > arrVal) {
+            maxArr[j] = dataVal;
           }
         }
       }
+
+      // console.log(maxArr, minArr);
+
+      upperValue = max.apply(null, maxArr);
+      lowerValue = stacked ? 0 : min.apply(null, minArr);
+
+      // console.log(upperValue, lowerValue)
     
       var maxSteps = floor(scaleHeight / (labelHeight * 0.66)),
         minSteps =  floor(scaleHeight / labelHeight * 0.5);
@@ -810,7 +955,7 @@
     
     scaleHop = floor(scaleHeight / calculatedScale.steps);
     calculateXAxisSize();
-    animationLoop(config, drawScale, drawLines, chart);
+    animationLoop(config, drawScale, stacked ? drawStackedLines : drawLines, chart);
   };
 
   window.Chart = Chart;
