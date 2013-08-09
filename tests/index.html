@@ -4,6 +4,15 @@
 
 <canvas id="test" width="700" height="400"></canvas>
 
+<style>
+	body {
+		background: black;
+	}
+
+	canvas {
+		background: white;
+	}
+</style>
 
 
 <script>
@@ -46,7 +55,8 @@
 		line = chart.create('line', data, {
 			bezierCurve: false,
 			animation: false,
-			area: 'stacked'
+			area: 'stacked',
+			scaleLabel: '<%=value%>'
 		});
 	
 	/*var test = document.getElementById('test'),

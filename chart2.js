@@ -130,7 +130,7 @@
   populateLabels = function(labelTemplateString, labels, numberOfSteps, graphMin, stepValue) {
     if (labelTemplateString) {
       // Fix floating point errors by setting to fixed the on the same decimal as the stepValue.
-      for (var i = 1; i < numberOfSteps + 1; i++) {
+      for (var i = 0; i < numberOfSteps + 1; i++) {
         labels.push(
           tmpl(labelTemplateString, {
             value: (graphMin + (stepValue * i))
@@ -173,202 +173,8 @@
   clear = function(gl, width, height) {
     gl.clearRect(0, 0, width, height);
   };
-
-  // Easing functions adapted from Robert Penner's easing equations
-  // http://www.robertpenner.com/easing/
-
-  var animationOptions = {
-    linear: function(t) {
-      return t;
-    },
-    easeInQuad: function(t) {
-      return t * t;
-    },
-    easeOutQuad: function(t) {
-      return -1 * t * (t - 2);
-    },
-    easeInOutQuad: function(t) {
-      if ((t /= 1 / 2) < 1) {
-        return 1/2*t*t;
-      }
-
-      return -1 / 2 * (--t * (t - 2) - 1);
-    },
-    easeInCubic: function(t) {
-      return t * t * t;
-    },
-    easeOutCubic: function(t) {
-      return 1 * ((t = t / 1 - 1) * t * t + 1);
-    },
-    easeInOutCubic: function(t) {
-      if ((t /= 1 / 2) < 1) {
-        return 1 / 2 * t * t * t;
-      }
-
-      return 1 / 2 * ((t -= 2) * t * t + 2);
-    },
-    easeInQuart: function(t) {
-      return t * t * t * t;
-    },
-    easeOutQuart: function(t) {
-      return -1 * ((t = t / 1 - 1) * t * t * t - 1);
-    },
-    easeInOutQuart: function(t) {
-      if ((t /= 1 / 2) < 1) {
-        return 1 / 2 * t * t * t * t;
-      }
-
-      return -1 / 2 * ((t -= 2) * t * t * t - 2);
-    },
-    easeInQuint: function(t) {
-      return 1 * (t /= 1) * t * t * t * t;
-    },
-    easeOutQuint: function(t) {
-      return 1 * ((t = t / 1 - 1) * t * t * t * t + 1);
-    },
-    easeInOutQuint: function(t) {
-      if ((t /= 1 / 2) < 1) {
-        return 1 / 2 * t * t * t * t * t;
-      }
-
-      return 1 / 2 * ((t -= 2) * t * t * t * t + 2);
-    },
-    easeInSine: function(t) {
-      return -1 * cos(t / 1 * (Math.PI / 2)) + 1;
-    },
-    easeOutSine: function(t) {
-      return 1 * sin(t / 1 * (Math.PI / 2));
-    },
-    easeInOutSine: function(t) {
-      return -1 / 2 * (cos(Math.PI * t / 1) - 1);
-    },
-    easeInExpo: function(t) {
-      return (t === 0) ? 1 : 1 * Math.pow(2, 10 * (t / 1 - 1));
-    },
-    easeOutExpo: function(t) {
-      return (t === 1) ? 1 : 1 * (-Math.pow(2, -10 * t / 1) + 1);
-    },
-    easeInOutExpo: function(t) {
-      if (!t || t === 1) return t;
-
-      if ((t /= 1 / 2) < 1) {
-        return 1 / 2 * Math.pow(2, 10 * (t - 1));
-      }
-
-      return 1 / 2 * (-Math.pow(2, -10 * --t) + 2);
-    },
-    easeInCirc: function(t) {
-      if (t >= 1) return t;
-      return -1 * (Math.sqrt(1 - (t /= 1) * t) - 1);
-    },
-    easeOutCirc: function(t) {
-      return 1 * Math.sqrt(1 - (t = t / 1 - 1) * t);
-    },
-    easeInOutCirc: function(t) {
-      if ((t /= 1 / 2) < 1) {
-        return -1 / 2 * (Math.sqrt(1 - t * t) - 1);
-      }
-
-      return 1 / 2 * Math.sqrt(1 - (t -= 2) * t) + 1;
-    },
-    easeInElastic: function(t) {
-      var s = 1.70158,
-        p,
-        a = 1;
-
-      if (!t || t === 1) return t;
-      p = 1 * 0.3;
-
-      /*if (a < 1) {
-        a = 1;
-        s = p / 4;
-      } else {*/
-        s = p / (2 * Math.PI) * Math.asin(1 / a);
-      //}
-
-      return -(a * Math.pow(2, 10 * (t -= 1)) *
-        sin((t * 1 - s) * (2 * Math.PI) / p));
-    },
-    easeOutElastic: function(t) {
-      var s = 1.70158,
-        p,
-        a = 1;
-
-      if (!t || t === 1) return t;
-      p = 1 * 0.3;
-
-
-      /*if (a < 1) {
-        a = 1;
-        s = p / 4;
-      } else {*/
-        s = p / (2 * Math.PI) * Math.asin(1 / a);
-      //}
-
-      return a * Math.pow(2, -10 * t) *
-        sin((t * 1 - s) * (2 * Math.PI) / p) + 1;
-    },
-    easeInOutElastic: function(t) {
-      var s = 1.70158,
-        p,
-        a = 1;
-
-      if (!t || t === 1) return t;
-      p = 1 * (0.3 * 1.5);
-
-      /*if (a < 1) {
-        a = 1;
-        s = p / 4;
-      } else {*/
-        s = p / (2 * Math.PI) * Math.asin(1 / a);
-      //}
-
-      if (t < 1) {
-        return -0.5 * (a * Math.pow(2, 10 * (t -= 1)) * sin((t * 1 - s) * (2 * Math.PI) / p));
-      }
-
-      return a * Math.pow(2, -10 * (t -= 1)) * sin((t * 1 - s) * (2 * Math.PI) / p) * 0.5 + 1;
-    },
-    easeInBack: function(t) {
-      var s = 1.70158;
-      return 1*(t/=1)*t*((s+1)*t - s);
-    },
-    easeOutBack: function(t) {
-      var s = 1.70158;
-      return 1*((t=t/1-1)*t*((s+1)*t + s) + 1);
-    },
-    easeInOutBack: function(t) {
-      var s = 1.70158; 
-
-      if ((t /= 1 / 2) < 1) {
-        return 1 / 2 * (t * t * (((s *= (1.525)) + 1) * t - s));
-      }
-
-      return 1 / 2 * ((t -= 2) * t * (((s *= (1.525)) + 1) * t + s) + 2);
-    },
-    easeInBounce: function(t) {
-      return 1 - animationOptions.easeOutBounce (1 - t);
-    },
-    easeOutBounce: function(t) {
-      if ((t /= 1) < 1 / 2.75) {
-        return 1 * (7.5625 * t * t);
-      } else if (t < (2 / 2.75)) {
-        return 1 * (7.5625 * (t -= (1.5 / 2.75)) * t + 0.75);
-      } else if (t < (2.5 / 2.75)) {
-        return 1 * (7.5625 * (t -= (2.25 / 2.75)) * t + 0.9375);
-      } else {
-        return 1 * (7.5625 * (t -= (2.625 / 2.75)) * t + 0.984375);
-      }
-    },
-    easeInOutBounce: function(t) {
-      if (t < 1 / 2) {
-        return animationOptions.easeInBounce(t * 2) * 0.5;
-      }
-
-      return animationOptions.easeOutBounce(t * 2 - 1) * 0.5 + 1 * 0.5;
-    }
-  },
-  charts = {};
+  
+  var charts = {};
 
   var Chart = function(canvas) {
     var chart = this,
@@ -585,22 +391,25 @@
         stack = [],
         newStack = [];
 
-      var yPos = function(index, noStack) {
+      var yPos = function(index, noStack, noCalc) {
         var size = animPc * calculateOffset(
           itemData[index],
           calculatedScale,
           scaleHop
         );
 
-        if (!noStack) {
+        if (!noCalc) {
           var stackedVal = stack[index] || 0;
           stackedVal /*= stack[index]*/ = size + stackedVal;
-          newStack.push(stackedVal);
+          
+          if (!noStack) {
+            newStack.push(stackedVal);
+          }
+
           size = xAxisPosY - stackedVal;
         } else {
           size = xAxisPosY - size;
         }
-
 
         return size
       },
@@ -628,7 +437,7 @@
 
         for (; j < itemLen; j++) {
           // not supported now
-          if (config.bezierCurve && false) {
+          if (config.bezierCurve/* && false*/) {
             gl.bezierCurveTo(
               // control 1
               xPos(j - 0.5),
@@ -659,7 +468,29 @@
           for (; g < stackLen; g++) {
             stackedVal = stack[g];
 
-            gl.lineTo(xPos(stack.length - (g + 1)), xAxisPosY - (stackedVal || 0));
+            var yVal = xAxisPosY - (stackedVal || 0),
+              gIndex = stack.length - (g + 1);
+
+            if (g && config.bezierCurve/* && false*/) {
+              gl.lineTo(xPos(gIndex), yVal);
+              // need curve for back path
+              /*gl.bezierCurveTo(
+                // control 1
+                xPos(gIndex),
+                yPos(g, true, true),
+
+                // control 2
+                xPos(gIndex),
+                yVal,
+
+                // end
+                xPos(gIndex),
+                yVal
+              );*/
+            } else {
+              gl.lineTo(xPos(gIndex), yVal);
+              //gl.lineTo(xPos(j), yPos(j));
+            }
           }
 
           gl.closePath();
@@ -731,14 +562,24 @@
 
           gl.rotate(-rotateLabels * (Math.PI / 180));
           gl.fillText(labels[i], 0, 0);
-          gl.restore();
+          // moved from here
         } else {
+          // uncomment this then size of canvas 'll be expanded to normal
+
+          if (i && i !== labelsLen - 1) {
+            gl.textAlign = 'center';
+          } else {
+            gl.textAlign = i ? 'end' : 'start';
+          }
+
           gl.fillText(
             labels[i],
             yAxisPosX + i * valueHop,
             xAxisPosY + config.scaleFontSize + 3
           );
         }
+
+        gl.restore(); // moved from ^
 
         gl.beginPath();
         gl.moveTo(yAxisPosX + i * valueHop, xAxisPosY + 3);
@@ -769,7 +610,7 @@
       var j = 0,
         steps = calculatedScale.steps;
 
-      for (; j < steps; j++) {
+      for (; j < steps + 1; j++) {
         gl.beginPath();
         gl.moveTo(yAxisPosX - 3, xAxisPosY - (j + 1) * scaleHop);
 
@@ -784,7 +625,7 @@
         gl.stroke();
         
         if (config.scaleShowLabels) {
-          gl.fillText(calculatedScale.labels[j], yAxisPosX - 8, xAxisPosY - (j + 1) * scaleHop);
+          gl.fillText(calculatedScale.labels[j], yAxisPosX - 8, xAxisPosY - (j) * scaleHop);
         }
       }
     },
@@ -992,5 +833,199 @@
    
     // Provide some basic currying to the user
     return data ? fn( data ) : fn;
+  };
+
+  // Easing functions adapted from Robert Penner's easing equations
+  // http://www.robertpenner.com/easing/
+  var animationOptions = {
+    linear: function(t) {
+      return t;
+    },
+    easeInQuad: function(t) {
+      return t * t;
+    },
+    easeOutQuad: function(t) {
+      return -1 * t * (t - 2);
+    },
+    easeInOutQuad: function(t) {
+      if ((t /= 1 / 2) < 1) {
+        return 1/2*t*t;
+      }
+
+      return -1 / 2 * (--t * (t - 2) - 1);
+    },
+    easeInCubic: function(t) {
+      return t * t * t;
+    },
+    easeOutCubic: function(t) {
+      return 1 * ((t = t / 1 - 1) * t * t + 1);
+    },
+    easeInOutCubic: function(t) {
+      if ((t /= 1 / 2) < 1) {
+        return 1 / 2 * t * t * t;
+      }
+
+      return 1 / 2 * ((t -= 2) * t * t + 2);
+    },
+    easeInQuart: function(t) {
+      return t * t * t * t;
+    },
+    easeOutQuart: function(t) {
+      return -1 * ((t = t / 1 - 1) * t * t * t - 1);
+    },
+    easeInOutQuart: function(t) {
+      if ((t /= 1 / 2) < 1) {
+        return 1 / 2 * t * t * t * t;
+      }
+
+      return -1 / 2 * ((t -= 2) * t * t * t - 2);
+    },
+    easeInQuint: function(t) {
+      return 1 * (t /= 1) * t * t * t * t;
+    },
+    easeOutQuint: function(t) {
+      return 1 * ((t = t / 1 - 1) * t * t * t * t + 1);
+    },
+    easeInOutQuint: function(t) {
+      if ((t /= 1 / 2) < 1) {
+        return 1 / 2 * t * t * t * t * t;
+      }
+
+      return 1 / 2 * ((t -= 2) * t * t * t * t + 2);
+    },
+    easeInSine: function(t) {
+      return -1 * cos(t / 1 * (Math.PI / 2)) + 1;
+    },
+    easeOutSine: function(t) {
+      return 1 * sin(t / 1 * (Math.PI / 2));
+    },
+    easeInOutSine: function(t) {
+      return -1 / 2 * (cos(Math.PI * t / 1) - 1);
+    },
+    easeInExpo: function(t) {
+      return (t === 0) ? 1 : 1 * Math.pow(2, 10 * (t / 1 - 1));
+    },
+    easeOutExpo: function(t) {
+      return (t === 1) ? 1 : 1 * (-Math.pow(2, -10 * t / 1) + 1);
+    },
+    easeInOutExpo: function(t) {
+      if (!t || t === 1) return t;
+
+      if ((t /= 1 / 2) < 1) {
+        return 1 / 2 * Math.pow(2, 10 * (t - 1));
+      }
+
+      return 1 / 2 * (-Math.pow(2, -10 * --t) + 2);
+    },
+    easeInCirc: function(t) {
+      if (t >= 1) return t;
+      return -1 * (Math.sqrt(1 - (t /= 1) * t) - 1);
+    },
+    easeOutCirc: function(t) {
+      return 1 * Math.sqrt(1 - (t = t / 1 - 1) * t);
+    },
+    easeInOutCirc: function(t) {
+      if ((t /= 1 / 2) < 1) {
+        return -1 / 2 * (Math.sqrt(1 - t * t) - 1);
+      }
+
+      return 1 / 2 * Math.sqrt(1 - (t -= 2) * t) + 1;
+    },
+    easeInElastic: function(t) {
+      var s = 1.70158,
+        p,
+        a = 1;
+
+      if (!t || t === 1) return t;
+      p = 1 * 0.3;
+
+      /*if (a < 1) {
+        a = 1;
+        s = p / 4;
+      } else {*/
+        s = p / (2 * Math.PI) * Math.asin(1 / a);
+      //}
+
+      return -(a * Math.pow(2, 10 * (t -= 1)) *
+        sin((t * 1 - s) * (2 * Math.PI) / p));
+    },
+    easeOutElastic: function(t) {
+      var s = 1.70158,
+        p,
+        a = 1;
+
+      if (!t || t === 1) return t;
+      p = 1 * 0.3;
+
+
+      /*if (a < 1) {
+        a = 1;
+        s = p / 4;
+      } else {*/
+        s = p / (2 * Math.PI) * Math.asin(1 / a);
+      //}
+
+      return a * Math.pow(2, -10 * t) *
+        sin((t * 1 - s) * (2 * Math.PI) / p) + 1;
+    },
+    easeInOutElastic: function(t) {
+      var s = 1.70158,
+        p,
+        a = 1;
+
+      if (!t || t === 1) return t;
+      p = 1 * (0.3 * 1.5);
+
+      /*if (a < 1) {
+        a = 1;
+        s = p / 4;
+      } else {*/
+        s = p / (2 * Math.PI) * Math.asin(1 / a);
+      //}
+
+      if (t < 1) {
+        return -0.5 * (a * Math.pow(2, 10 * (t -= 1)) * sin((t * 1 - s) * (2 * Math.PI) / p));
+      }
+
+      return a * Math.pow(2, -10 * (t -= 1)) * sin((t * 1 - s) * (2 * Math.PI) / p) * 0.5 + 1;
+    },
+    easeInBack: function(t) {
+      var s = 1.70158;
+      return 1*(t/=1)*t*((s+1)*t - s);
+    },
+    easeOutBack: function(t) {
+      var s = 1.70158;
+      return 1*((t=t/1-1)*t*((s+1)*t + s) + 1);
+    },
+    easeInOutBack: function(t) {
+      var s = 1.70158; 
+
+      if ((t /= 1 / 2) < 1) {
+        return 1 / 2 * (t * t * (((s *= (1.525)) + 1) * t - s));
+      }
+
+      return 1 / 2 * ((t -= 2) * t * (((s *= (1.525)) + 1) * t + s) + 2);
+    },
+    easeInBounce: function(t) {
+      return 1 - animationOptions.easeOutBounce (1 - t);
+    },
+    easeOutBounce: function(t) {
+      if ((t /= 1) < 1 / 2.75) {
+        return 1 * (7.5625 * t * t);
+      } else if (t < (2 / 2.75)) {
+        return 1 * (7.5625 * (t -= (1.5 / 2.75)) * t + 0.75);
+      } else if (t < (2.5 / 2.75)) {
+        return 1 * (7.5625 * (t -= (2.25 / 2.75)) * t + 0.9375);
+      } else {
+        return 1 * (7.5625 * (t -= (2.625 / 2.75)) * t + 0.984375);
+      }
+    },
+    easeInOutBounce: function(t) {
+      if (t < 1 / 2) {
+        return animationOptions.easeInBounce(t * 2) * 0.5;
+      }
+
+      return animationOptions.easeOutBounce(t * 2 - 1) * 0.5 + 1 * 0.5;
+    }
   };
 }());
