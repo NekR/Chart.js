@@ -389,7 +389,9 @@
         itemData,
         itemLen,
         stack = [],
-        newStack = [];
+        newStack = [],
+        points1 = [],
+        points2 = [];
 
       var yPos = function(index, noStack, noCalc) {
         var size = animPc * calculateOffset(
@@ -438,6 +440,16 @@
         for (; j < itemLen; j++) {
           // not supported now
           if (config.bezierCurve/* && false*/) {
+            /*points1.push({
+              x: xPos(j - 0.5),
+              y: yPos(j - 1, true)
+            });
+
+            points2.push({
+              x: xPos(j - 0.5),
+              y: yPos(j, true)
+            });*/
+
             gl.bezierCurveTo(
               // control 1
               xPos(j - 0.5),
@@ -471,22 +483,31 @@
             var yVal = xAxisPosY - (stackedVal || 0),
               gIndex = stack.length - (g + 1);
 
-            if (g && config.bezierCurve/* && false*/) {
-              gl.lineTo(xPos(gIndex), yVal);
+            if (i && g && config.bezierCurve/* && false*/) {
+              /*points1.push({
+                x: xPos(gIndex + 0.5),
+                y: xAxisPosY - stack[g - 1]
+              });
+
+              points2.push({
+                x: xPos(gIndex + 0.5),
+                y: xAxisPosY - stack[g]
+              });*/
+
               // need curve for back path
-              /*gl.bezierCurveTo(
+              gl.bezierCurveTo(
                 // control 1
-                xPos(gIndex),
-                yPos(g, true, true),
+                xPos(gIndex + 0.5),
+                xAxisPosY - stack[g - 1],
 
                 // control 2
-                xPos(gIndex),
-                yVal,
+                xPos(gIndex + 0.5),
+                xAxisPosY - stack[g],
 
                 // end
                 xPos(gIndex),
                 yVal
-              );*/
+              );
             } else {
               gl.lineTo(xPos(gIndex), yVal);
               //gl.lineTo(xPos(j), yPos(j));
@@ -528,6 +549,47 @@
         stack = newStack;
         newStack = [];
       }
+      gl.save();
+      gl.fillStyle = 'red';
+      gl.strokeStyle = item.pointStrokeColor;
+      gl.lineWidth = config.pointDotStrokeWidth;
+
+      points1.forEach(function(point) {
+        gl.beginPath();
+        gl.arc(
+          point.x,
+          point.y,
+          config.pointDotRadius,
+          0,
+          Math.PI * 2,
+          true
+        );
+
+        gl.fill();
+        gl.stroke();
+      });
+      
+
+      gl.fillStyle = 'green';
+      gl.strokeStyle = item.pointStrokeColor;
+      gl.lineWidth = config.pointDotStrokeWidth;
+
+      points2.forEach(function(point) {
+        gl.beginPath();
+        gl.arc(
+          point.x,
+          point.y,
+          config.pointDotRadius,
+          0,
+          Math.PI * 2,
+          true
+        );
+
+        gl.fill();
+        gl.stroke();
+      });
+      gl.closePath();
+      gl.restore();
     },
     drawScale = function() {
       // X axis line
