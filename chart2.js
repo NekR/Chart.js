@@ -748,12 +748,16 @@
         if (width / len < cos(rotateLabels) * widestXLabel) {
           rotateLabels = 90;
           maxSize -= widestXLabel;
+          maxSize -= 10;
         } else {
           maxSize -= sin(rotateLabels) * widestXLabel;
+          maxSize -= 5;
         }
       } else {
         maxSize -= config.scaleFontSize;
       }
+
+      console.log(widestXLabel);
 
       // Add a little padding between the x line and the text
       maxSize -= 5;
