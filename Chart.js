@@ -360,11 +360,14 @@ window.Chart = function(context) {
         ctx.beginPath();
         ctx.moveTo(yAxisPosX, xAxisPosY - animPc*(calculateOffset(data.datasets[i].data[0],calculatedScale,scaleHop)))
 
+        console.log(yAxisPosX, xAxisPosY - animPc*(calculateOffset(data.datasets[i].data[0],calculatedScale,scaleHop)));
+
         for (var j=1; j<data.datasets[i].data.length; j++){
           if (config.bezierCurve){
             ctx.bezierCurveTo(xPos(j-0.5),yPos(i,j-1),xPos(j-0.5),yPos(i,j),xPos(j),yPos(i,j));
           }
           else{
+            i === 1 && console.log((xPos(j), yPos(i, j)));
             ctx.lineTo(xPos(j),yPos(i,j));
           }
         }
