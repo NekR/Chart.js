@@ -127,7 +127,12 @@
     };
   },
   // Populate an array of all the labels by interpolating the string.
-  populateLabels = function(labelTemplateString, labels, numberOfSteps, graphMin, stepValue) {
+  populateLabels = function(labelTemplateString) {
+    var labels = [],
+      numberOfSteps = this.steps,
+      graphMin = this.graphMin,
+      stepValue = this.stepValue;
+
     if (labelTemplateString) {
       // Fix floating point errors by setting to fixed the on the same decimal as the stepValue.
       for (var i = 0; i < numberOfSteps + 1; i++) {
@@ -139,6 +144,8 @@
         );
       }
     }
+
+    this.populatedLabels = labels;
   },
   // Default if undefined
   Default = function(userDeclared, valueIfFalse) {
@@ -229,22 +236,24 @@
 
   var defaults = {
     line: {
-      scaleOverlay: false,
-      scaleOverride: false,
-      scaleSteps: null,
-      scaleStepWidth: null,
-      scaleStartValue: null,
-      scaleLineColor: 'rgba(0, 0, 0, 0.1)',
-      scaleLineWidth: 1,
-      scaleShowLabels: true,
-      scaleLabel: '<%=value%>',
-      scaleFontFamily: 'Arial',
-      scaleFontSize: 12,
-      scaleFontStyle: 'normal',
-      scaleFontColor: '#666',
-      scaleShowGridLines: true,
-      scaleGridLineColor: 'rgba(0, 0, 0, .05)',
-      scaleGridLineWidth: 1,
+      scale: {
+        overlay: false,
+        override: false,
+        steps: null,
+        stepWidth: null,
+        startValue: null,
+        lineColor: 'rgba(0, 0, 0, 0.1)',
+        lineWidth: 1,
+        showLabels: true,
+        label: '<%=value%>',
+        fontFamily: 'Arial',
+        fontSize: 12,
+        fontStyle: 'normal',
+        fontColor: '#666',
+        showGridLines: true,
+        gridLineColor: 'rgba(0, 0, 0, .05)',
+        gridLineWidth: 1,
+      },
 
       bezierCurve: true,
       pointDot: true,
@@ -262,6 +271,108 @@
     }
   };
 
+  var Scale = function(options) {
+    this.size = options.size;
+    this.config = options.config;
+    this.series = options.series;
+
+    this.calculateMetrics();
+  };
+
+  Scale.prototype = {};
+
+  Scale.prototype.calculateMetrics = function() {
+    var maxValue = 0,
+      minValue = 0,
+      maxSteps,
+      minSteps,
+      series = this.series,
+      seriesLen = series.length,
+      item,
+      itemData,
+      itemLen,
+      dataVal,
+      minArr = [Number.MAX_VALUE], // 0 for value from 0
+      maxArr = [Number.MIN_VALUE],
+      arrVal,
+      stacked = this.stacked,
+      i,
+      j;
+
+    for (i = 0; i < seriesLen; i++) {
+      item = series[i];
+      //itemData = item.data;
+      itemLen = item.length;
+
+      for (j = 0; j < itemLen; j++) {
+        dataVal = item[j];
+
+        arrVal = minArr[j] || 0;
+
+        if (!stacked && dataVal < arrVal) {
+          minArr[j] = dataVal;
+        }
+
+        arrVal = maxArr[j] || 0;
+
+        if (stacked) {
+          maxArr[j] = arrVal + dataVal;
+        } else if (dataVal > arrVal) {
+          maxArr[j] = dataVal;
+        }
+      }
+    }
+
+    maxValue = max.apply(null, maxArr);
+    minValue = stacked ? 0 : min.apply(null, minArr);
+    
+    /*maxSteps = floor(this.size / (labelHeight * 0.66)),
+    minSteps =  floor(this.size / labelHeight * 0.5);*/
+
+    var graphMin,
+      graphMax,
+      graphRange,
+      stepValue,
+      numberOfSteps,
+      valueRange,
+      rangeOrderOfMagnitude;
+    
+    valueRange = maxValue - minValue;
+    
+    rangeOrderOfMagnitude = calculateOrderOfMagnitude(valueRange);
+    stepValue = pow(10, rangeOrderOfMagnitude);
+    graphMin = floor(minValue / stepValue) * stepValue;
+    graphMax = ceil(maxValue / stepValue) * stepValue;
+    graphRange = graphMax - graphMin;
+    numberOfSteps = round(graphRange / stepValue);
+
+    // Compare number of steps to the max and min for that size graph,
+    // and add in half steps if need be.
+
+    /*while (numberOfSteps < minSteps || numberOfSteps > maxSteps) {
+      if (numberOfSteps < minSteps) {
+        stepValue /= 2;
+        numberOfSteps = round(graphRange / stepValue);
+      } else {
+        stepValue *= 2;
+        numberOfSteps = round(graphRange / stepValue);
+      }
+    }*/
+    
+    this.steps = numberOfSteps;
+    this.stepValue = stepValue;
+    this.graphMin = graphMin;
+    this.scaleHop = floor(this.size / this.steps);
+  };
+
+  Scale.prototype.calculateOffset = function(val) {
+    var outerValue = this.steps * this.stepValue,
+      adjustedValue = val - this.graphMin,
+      scalingFactor = capValue(adjustedValue / outerValue, 1, 0);
+
+    return (this.scaleHop * this.steps) * scalingFactor;
+  };
+
   Chart.prototype = {
     create: function(type, data, options) {
       type = type.toLowerCase();
@@ -272,21 +383,49 @@
     }
   };
 
+  (function() {
+    var calculateScale = function(axis) {
+      var graphMin,
+        graphMax,
+        graphRange,
+        stepValue,
+        numberOfSteps,
+        valueRange,
+        rangeOrderOfMagnitude,
+        decimalNum;
+      
+      valueRange = axis.maxValue - axis.minValue;
+      
+      rangeOrderOfMagnitude = calculateOrderOfMagnitude(valueRange);
+      stepValue = pow(10, rangeOrderOfMagnitude);
+      graphMin = floor(minValue / stepValue) * stepValue;
+      graphMax = ceil(maxValue / stepValue) * stepValue;
+      graphRange = graphMax - graphMin;
+      numberOfSteps = round(graphRange / stepValue);
+
+      // Compare number of steps to the max and min for that size graph,
+      // and add in half steps if need be.
+
+      while (numberOfSteps < minSteps || numberOfSteps > maxSteps) {
+        if (numberOfSteps < minSteps) {
+          stepValue /= 2;
+          numberOfSteps = round(graphRange / stepValue);
+        } else {
+          stepValue *= 2;
+          numberOfSteps = round(graphRange / stepValue);
+        }
+      }
+    
+      return {
+        steps: numberOfSteps,
+        stepValue: stepValue,
+        graphMin: graphMin
+      };
+    }
+  }());
+
   var Line = charts.line = function(data, config, chart) {
-    var maxSize,
-      scaleHop,
-      calculatedScale,
-      labelHeight,
-      scaleHeight,
-      valueBounds,
-      labelTemplateString,
-      valueHop,
-      widestXLabel,
-      xAxisLength,
-      yAxisPosX,
-      xAxisPosY,
-      rotateLabels = 0,
-      gl = chart.context,
+    var gl = chart.context,
       width = chart.width,
       height = chart.height,
       stacked = config.area === 'stacked';
@@ -690,8 +829,10 @@
           gl.fillText(calculatedScale.labels[j], yAxisPosX - 8, xAxisPosY - (j) * scaleHop);
         }
       }
-    },
-    calculateXAxisSize = function() {
+    };
+
+
+    var calculateXAxisSize = function() {
       var longestText = 1;
 
       // if we are showing the labels
@@ -826,49 +967,316 @@
       };
     };
 
-    calculateDrawingSizes();
-    valueBounds = getValueBounds();
+    /*var Axis = function() {
 
-    // Check and set the scale
-    labelTemplateString = (config.scaleShowLabels) ? config.scaleLabel : '';
+    };
 
-    if (!config.scaleOverride) {
-      calculatedScale = calculateScale(
-        scaleHeight,
-        valueBounds.maxSteps,
-        valueBounds.minSteps,
-        valueBounds.maxValue,
-        valueBounds.minValue,
-        labelTemplateString
-      );
+    Axis.prototype = {
+      calculateSizes: function() {
+        var height = this.chart.height,
+          gl = this.chart.context,
+          maxSize = height,
+          scale = this.scale;
 
-      console.log(calculatedScale);
-    } else {
-      calculatedScale = {
-        steps: config.scaleSteps,
-        stepValue: config.scaleStepWidth,
-        graphMin: config.scaleStartValue,
-        labels: []
+        // Need to check the X axis first - measure the length of each text metric,
+        // and figure out if we need to rotate by 45 degrees.
+        gl.font = scale.fontStyle + ' ' +
+          scale.fontSize + 'px ' + scale.fontFamily;
+
+        var i = 0,
+          labels = this.labels,
+          len = labels.length,
+          textLength,
+          widestXLabel = 0;
+
+        for (; i < len; i++) {
+          textLength = gl.measureText(labels[i]).width;
+
+          // If the text length is longer - make that equal to longest text!
+          widestXLabel = (textLength > widestXLabel) ? textLength : widestXLabel;
+        }
+
+        var divided = width / len;
+
+        if (divided < widestXLabel) {
+          rotateLabels = 45;
+
+          if (divided < cos(rotateLabels) * widestXLabel) {
+            rotateLabels = 90;
+            maxSize -= widestXLabel;
+            maxSize -= 10;
+          } else {
+            maxSize -= sin(rotateLabels) * widestXLabel;
+            maxSize -= 5;
+          }
+        } else {
+          maxSize -= scale.fontSize;
+        }
+
+        // Add a little padding between the x line and the text
+        maxSize -= 5;
+        labelHeight = scale.fontSize;
+        
+        maxSize -= labelHeight;
+
+        // Set 5 pixels greater than the font size to allow for a little padding from the X axis.
+        // Then get the area above we can safely draw on.
+        scaleHeight = maxSize;
+      },
+      canculateBounds: function(data) {
+        var upperValue = 0,
+          lowerValue = 0,
+          len = data.length,
+          item,
+          itemData,
+          itemLen,
+          dataVal,
+          minArr = [Number.MAX_VALUE], // 0 for value from 0
+          maxArr = [Number.MIN_VALUE],
+          arrVal,
+          stacked = this.stacked,
+          i,
+          j;
+
+        for (i = 0; i < len; i++) {
+          item = data[i];
+          itemData = item.data;
+          itemLen = itemData.length;
+
+          for (j = 0; j < itemLen; j++) {
+            dataVal = itemData[j];
+
+            arrVal = minArr[j] || 0;
+
+            if (!stacked && dataVal < arrVal) {
+              minArr[j] = dataVal;
+            }
+
+            arrVal = maxArr[j] || 0;
+
+            if (stacked) {
+              maxArr[j] = arrVal + dataVal;
+            } else if (dataVal > arrVal) {
+              maxArr[j] = dataVal;
+            }
+          }
+        }
+
+        // console.log(maxArr, minArr);
+
+        upperValue = max.apply(null, maxArr);
+        lowerValue = stacked ? 0 : min.apply(null, minArr);
+
+        // console.log(upperValue, lowerValue)
+        
+        var maxSteps = floor(scaleHeight / (labelHeight * 0.66)),
+          minSteps =  floor(scaleHeight / labelHeight * 0.5);
+
+        this.maxValue = upperValue;
+        this.minValue = lowerValue;
+        this.maxSteps = maxSteps;
+        this.minSteps = minSteps;
+      },
+      calculateScale: function(axis) {
+        var graphMin,
+          graphMax,
+          graphRange,
+          stepValue,
+          numberOfSteps,
+          valueRange,
+          rangeOrderOfMagnitude;
+
+        axix = this;
+
+        var maxValue = axis.maxValue,
+          minValue = axis.minValue,
+          maxSteps = axis.maxSteps,
+          minSteps = axis.minSteps;
+        
+        valueRange = maxValue - minValue;
+        
+        rangeOrderOfMagnitude = calculateOrderOfMagnitude(valueRange);
+        stepValue = pow(10, rangeOrderOfMagnitude);
+        graphMin = floor(minValue / stepValue) * stepValue;
+        graphMax = ceil(maxValue / stepValue) * stepValue;
+        graphRange = graphMax - graphMin;
+        numberOfSteps = round(graphRange / stepValue);
+
+        // Compare number of steps to the max and min for that size graph,
+        // and add in half steps if need be.
+
+        while (numberOfSteps < minSteps || numberOfSteps > maxSteps) {
+          if (numberOfSteps < minSteps) {
+            stepValue /= 2;
+            numberOfSteps = round(graphRange / stepValue);
+          } else {
+            stepValue *= 2;
+            numberOfSteps = round(graphRange / stepValue);
+          }
+        }
+      
+        this.steps = numberOfSteps;
+        this.stepValue = stepValue;
+        this.graphMin = graphMin;
+      },
+      calculateXAxisSize = function() {
+        var longestText = 0;
+
+        // if we are showing the labels
+        if (config.scaleShowLabels) {
+          gl.font = config.scaleFontStyle + ' ' +
+            config.scaleFontSize + 'px ' + config.scaleFontFamily;
+
+          var i = 0,
+            labels = calculatedScale.labels,
+            len = labels.length
+            measuredText;
+
+          for (; i < len; i++) {
+            measuredText = gl.measureText(labels[i]).width;
+
+            longestText = (measuredText > longestText) ?
+              measuredText : longestText;
+          }
+
+          // Add a little extra padding from the y axis
+          longestText += 10;
+        }
+
+        xAxisLength = width - longestText - widestXLabel;
+        valueHop = floor(xAxisLength / (data.labels.length - 1));
+          
+        yAxisPosX = width - widestXLabel / 2 - xAxisLength;
+        xAxisPosY = scaleHeight + config.scaleFontSize / 2;
+      }
+    };*/
+
+    var yData = data.datasets.map(function(set) {
+      return set.data;
+    }),
+    xData = data.datasets.map(function(set) {
+      return set.data.map(function(val, i) {
+        return i;
+      });
+    });
+
+    var yScale,
+      xScale;
+
+    var widestXLabel;
+
+    (function() {
+      var maxSize = height;
+
+      // Need to check the X axis first - measure the length of each text metric,
+      // and figure out if we need to rotate by 45 degrees.
+      gl.font = config.scale.fontStyle + ' ' +
+        config.scale.fontSize + 'px ' + config.scale.fontFamily;
+
+      widestXLabel = 1;
+
+      var i = 0,
+        labels = data.labels,
+        len = labels.length,
+        textLength;
+
+      for (; i < len; i++){
+        textLength = gl.measureText(labels[i]).width;
+
+        // If the text length is longer - make that equal to longest text!
+        widestXLabel = (textLength > widestXLabel) ? textLength : widestXLabel;
       }
 
-      populateLabels(
-        labelTemplateString,
-        calculatedScale.labels,
-        calculatedScale.steps,
-        config.scaleStartValue,
-        config.scaleStepWidth
-      );
-    }
-    
-    scaleHop = floor(scaleHeight / calculatedScale.steps);
-    calculateXAxisSize();
-    animationLoop(config, drawScale, stacked ? drawStackedLines : drawLines, chart);
+      if (width / len < widestXLabel) {
+        rotateLabels = 45;
+
+        if (width / len < cos(rotateLabels) * widestXLabel) {
+          rotateLabels = 90;
+          maxSize -= widestXLabel;
+          maxSize -= 10;
+        } else {
+          maxSize -= sin(rotateLabels) * widestXLabel;
+          maxSize -= 5;
+        }
+      } else {
+        maxSize -= config.scale.fontSize;
+      }
+
+      // Add a little padding between the x line and the text
+      maxSize -= 5;
+
+      var labelHeight = config.scale.fontSize;
+      
+      maxSize -= labelHeight;
+
+      // Set 5 pixels greater than the font size to allow for a little padding from the X axis.
+      // Then get the area above we can safely draw on.
+
+      yScale = new Scale({
+        series: yData,
+        size: maxSize
+      });
+    }());
+
+    var valueHop;
+
+    (function() {
+      var longestText = 1;
+
+      // if we are showing the labels
+      if (config.scale.showLabels && false) {
+        gl.font = config.scale.fontStyle + ' ' +
+          config.scale.fontSize + 'px ' + config.scale.fontFamily;
+
+        var i = 0,
+          labels = calculatedScale.labels,
+          len = labels.length
+          measuredText;
+
+        for (; i < len; i++) {
+          var measuredText = gl.measureText(labels[i]).width;
+
+          longestText = (measuredText > longestText) ?
+            measuredText : longestText;
+        }
+
+        // Add a little extra padding from the y axis
+        longestText += 10;
+      }
+
+      var xSize = width - longestText - widestXLabel;
+
+      valueHop = floor(xSize / (data.labels.length - 1));
+        
+      // in x
+      // yAxisPosX = width - widestXLabel / 2 - xSize;
+
+      // in y
+      // xAxisPosY = scaleHeight + config.scale.fontSize / 2;
+
+      xScale = new Scale({
+        series: xData,
+        size: xSize
+      });
+    }());
+/*
+    calculateDrawingSizes();
+    valueBounds = getValueBounds();*/
+
+    // Check and set the scale
+    //labelTemplateString = (config.scale.showLabels) ? config.scale.label : '';
+
+    console.log(xScale, yScale);
+
+
+    //animationLoop(config, drawScale, stacked ? drawStackedLines : drawLines, chart);
   };
 
   window.Chart = Chart;
 
 
-  //Javascript micro templating by John Resig - source at http://ejohn.org/blog/javascript-micro-templating/
+  //Javascript micro templating by John Resig -
+  // source at http://ejohn.org/blog/javascript-micro-templating/
   var cache = {};
   
   function tmpl(str, data){
