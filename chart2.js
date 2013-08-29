@@ -12,6 +12,8 @@
     abs = Math.abs,
     isArray = Array.isArray;
 
+  var AXIS_LEFT_PADDING = 20;
+
   var capValue = function(valueToCap, maxValue, minValue) {
     if (isNumber(maxValue)) {
       if (valueToCap > maxValue) {
@@ -125,9 +127,470 @@
   },
   clear = function(gl, width, height) {
     gl.clearRect(0, 0, width, height);
+  },
+  calcLabelsSize = function(axis, gl) {
+    var labels = axis.labels,
+      widestLabel = 0,
+      textLength,
+      i = 0,
+      len = labels.length;
+
+    gl.save();
+
+    gl.font = axis.config.fontStyle + ' ' +
+      axis.config.fontSize + 'px ' + axis.config.fontFamily;
+
+    for (; i < len; i++){
+      textLength = gl.measureText(labels[i]).width;
+
+      // If the text length is longer - make that equal to longest text!
+      textLength > widestLabel && (widestLabel = textLength);
+    }
+
+    gl.restore();
+
+    return widestLabel;
+  },
+  makeScaleSeries = function(series) {
+    if (isArray(series)) {
+      series.forEach(function(serie) {
+        var data = serie.data;
+
+        if (isArray(data)) {
+          serie.x = [];
+          serie.y = [];
+
+          var x = serie.x,
+            y = serie.y;
+
+          data.forEach(function(val, i) {
+            if (isFinite(val) && val != null) {
+              y.push(val);
+              x.push(i);
+            } else if (isArray(val)) {
+              x.push(val[0]);
+              y.push(val[1]);
+            } else if (typeof val === 'object') {
+              x.push(val.x);
+              y.push(val.y);
+            } else {
+              y.push(null);
+              x.push(null);
+            }
+          });
+        }
+      });
+    }
+
+    return series;
   };
+
+
   
-  var charts = {};
+  var charts = {},
+    plotCharts = {},
+    axesDefaults = {
+      x: {
+        overlay: false,
+        override: false,
+        steps: null,
+        stepWidth: null,
+        startValue: null,
+        lineColor: 'rgba(0, 0, 0, 0.1)',
+        lineWidth: 1,
+        showLabels: true,
+        labelsTemplate: null,
+        fontFamily: 'Arial',
+        fontSize: 12,
+        fontStyle: 'normal',
+        fontColor: '#666',
+        showGridLines: true,
+        gridLineColor: 'rgba(0, 0, 0, .1)',
+        gridLineWidth: 1,
+        startAtZero: false,
+        stacked: false
+      },
+      y: {
+        overlay: false,
+        override: false,
+        steps: null,
+        stepWidth: null,
+        startValue: null,
+        lineColor: 'rgba(0, 0, 0, 0.1)',
+        lineWidth: 1,
+        showLabels: true,
+        labelsTemplate: null,
+        fontFamily: 'Arial',
+        fontSize: 12,
+        fontStyle: 'normal',
+        fontColor: '#666',
+        showGridLines: true,
+        gridLineColor: 'rgba(0, 0, 0, .1)',
+        gridLineWidth: 1,
+        startAtZero: true,
+        stacked: false
+      }
+    };
+
+  plotCharts.line = function(data, config, chart) {
+    var gl = chart.context,
+      width = chart.width,
+      height = chart.height,
+      series = makeScaleSeries(data.series),
+      stacked;
+
+    chart.setAxes(data.axes);
+
+    series.forEach(function(serie) {
+      chart.addSerie(serie);
+    });
+
+    stacked = chart.yConfig.stacked;
+
+
+    !stacked ? (this.draw = function(animPc) {
+      var i = 0,
+        len = series.length,
+        item,
+        itemX,
+        itemY,
+        itemLen,
+        xAxis = chart.xAxis,
+        yAxis = chart.yAxis;
+
+      animPc = 1;
+
+      var yPos = function(iteration) {
+        var res = yAxis.offset - animPc * yAxis.calculatePoint(
+          itemY[iteration]
+        );
+
+        return res;
+      },
+      xPos = function(iteration, slice) {
+        var res = animPc * xAxis.calculatePoint(
+          itemX[iteration]
+        );
+
+        if (slice && slice < 0) {
+          res += (res - animPc * xAxis.calculatePoint(
+            itemX[iteration - 1]
+          )) * slice;
+        }
+
+        // return xAxis.offset + xAxis.scaleHop * iteration;
+
+        return xAxis.offset + res;
+      };
+
+      for (; i < len; i++) {
+        item = series[i];
+        itemX = item.x;
+        itemY = item.y;
+        itemLen = itemX.length;
+
+        gl.strokeStyle = item.strokeColor;
+        gl.lineWidth = config.datasetStrokeWidth;
+        gl.beginPath();
+        gl.moveTo(
+          xPos(0),
+          yPos(0)
+        );
+
+        console.log(xPos(0), yPos(0));
+
+        var j = 1;
+
+        for (; j < itemLen; j++) {
+          if (config.bezierCurve) {
+            gl.bezierCurveTo(
+              xPos(j, -0.5),
+              yPos(j - 1),
+              xPos(j, -0.5),
+              yPos(j),
+              xPos(j),
+              yPos(j)
+            );
+          } else {
+            gl.lineTo(xPos(j), yPos(j));
+          }
+        }
+
+        gl.stroke();
+
+        if (config.datasetFill) {
+          gl.lineTo(xPos(itemLen - 1), yAxis.offset);
+          gl.lineTo(xPos(0), yAxis.offset);
+
+          gl.closePath();
+          gl.fillStyle = item.fillColor;
+          gl.fill();
+        } else {
+          gl.closePath();
+        }
+
+        if (config.pointDot) {
+          gl.fillStyle = item.pointColor;
+          gl.strokeStyle = item.pointStrokeColor;
+          gl.lineWidth = config.pointDotStrokeWidth;
+
+          var k = 0;
+
+          for (; k < itemLen; k++) {
+            gl.beginPath();
+
+            gl.arc(
+              xPos(k),
+              yPos(k),
+              config.pointDotRadius,
+              0,
+              Math.PI * 2,
+              true
+            );
+
+            gl.fill();
+            gl.stroke();
+          }
+        }
+      }
+    }) :
+
+    (this.draw = function(animPc) {
+      var i = 0,
+        len = series.length,
+        item,
+        itemX,
+        itemY,
+        itemLen,
+        xAxis = chart.xAxis,
+        yAxis = chart.yAxis,
+        stack = [],
+        newStack = [],
+        points1 = [],
+        points2 = [];
+
+      animPc = 1;
+
+      var yPos = function(index, noStack, noCalc) {
+        var size = animPc * yAxis.calculatePoint(
+          itemY[index]
+        );
+
+        if (!noCalc) {
+          var stackedVal = stack[index] || 0;
+          stackedVal /*= stack[index]*/ = size + stackedVal;
+          
+          if (!noStack) {
+            newStack.push(stackedVal);
+          }
+
+          size = yAxis.offset - stackedVal;
+        } else {
+          size = yAxis.offset - size;
+        }
+
+        return size
+      },
+      xPos = function(index, slice) {
+        var res = animPc * xAxis.calculatePoint(
+          itemX[index]
+        );
+
+        if (slice && slice < 0) {
+          res += (res - animPc * xAxis.calculatePoint(
+            itemX[index - 1]
+          )) * slice;
+        } 
+
+        if (slice && slice > 0) {
+          res += (animPc * xAxis.calculatePoint(
+            itemX[index + 1]
+          ) - res) * slice;
+        }
+
+        return xAxis.offset + res;
+      };
+
+      for (; i < len; i++) {
+        item = series[i];
+        itemX = item.x;
+        itemY = item.y;
+        itemLen = itemX.length;
+        stackedVal = stack[0] || 0;
+
+        gl.strokeStyle = item.strokeColor;
+        gl.lineWidth = config.datasetStrokeWidth;
+        gl.beginPath();
+
+        gl.moveTo(xPos(0), yPos(0));
+
+        var j = 1;
+
+        if (stack.length < itemLen) {
+          stack.length = itemLen;
+        }
+
+        for (; j < itemLen; j++) {
+          if (config.bezierCurve) {
+            /*points1.push({
+              x: xPos(j - 0.5),
+              y: yPos(j - 1, true)
+            });
+
+            points2.push({
+              x: xPos(j - 0.5),
+              y: yPos(j, true)
+            });*/
+
+            gl.bezierCurveTo(
+              // control 1
+              xPos(j, -0.5),
+              yPos(j - 1, true),
+
+              // control 2
+              xPos(j, -0.5),
+              yPos(j, true),
+
+              // end
+              xPos(j),
+              yPos(j)
+            );
+          } else {
+            gl.lineTo(xPos(j), yPos(j));
+          }
+        }
+
+        gl.stroke();
+
+        if (config.datasetFill) {
+          stack.reverse();
+
+          var g = 0,
+            stackLen = stack.length,
+            stackedVal;
+
+          for (; g < stackLen; g++) {
+            stackedVal = stack[g];
+
+            var yVal = yAxis.offset - (stackedVal || 0),
+              gIndex = stack.length - (g + 1);
+
+            if (i && g && config.bezierCurve) {
+              /*points1.push({
+                x: xPos(gIndex + 0.5),
+                y: xAxisPosY - stack[g - 1]
+              });
+
+              points2.push({
+                x: xPos(gIndex + 0.5),
+                y: xAxisPosY - stack[g]
+              });*/
+
+              // need curve for back path
+              gl.bezierCurveTo(
+                // control 1
+                xPos(gIndex, 0.5),
+                yAxis.offset - stack[g - 1],
+
+                // control 2
+                xPos(gIndex, 0.5),
+                yAxis.offset - stack[g],
+
+                // end
+                xPos(gIndex),
+                yVal
+              );
+            } else {
+              gl.lineTo(xPos(gIndex), yVal);
+            }
+          }
+
+          gl.closePath();
+          gl.fillStyle = item.fillColor;
+          gl.fill();
+        } else {
+          gl.closePath();
+        }
+
+        if (config.pointDot) {
+          gl.fillStyle = item.pointColor;
+          gl.strokeStyle = item.pointStrokeColor;
+          gl.lineWidth = config.pointDotStrokeWidth;
+
+          stack.reverse();
+
+          var k = 0;
+
+          for (; k < itemLen; k++) {
+            gl.beginPath();
+            gl.arc(
+              xPos(k),
+              yAxis.offset - (newStack[k] || 0),
+              config.pointDotRadius,
+              0,
+              Math.PI * 2,
+              true
+            );
+
+            gl.fill();
+            gl.stroke();
+          }
+        }
+
+        stack = newStack;
+        newStack = [];
+      }
+
+      {
+        /*gl.save();
+        gl.fillStyle = 'red';
+        gl.strokeStyle = item.pointStrokeColor;
+        gl.lineWidth = config.pointDotStrokeWidth;
+
+        points1.forEach(function(point) {
+          gl.beginPath();
+          gl.arc(
+            point.x,
+            point.y,
+            config.pointDotRadius,
+            0,
+            Math.PI * 2,
+            true
+          );
+
+          gl.fill();
+          gl.stroke();
+        });
+        
+
+        gl.fillStyle = 'green';
+        gl.strokeStyle = item.pointStrokeColor;
+        gl.lineWidth = config.pointDotStrokeWidth;
+
+        points2.forEach(function(point) {
+          gl.beginPath();
+          gl.arc(
+            point.x,
+            point.y,
+            config.pointDotRadius,
+            0,
+            Math.PI * 2,
+            true
+          );
+
+          gl.fill();
+          gl.stroke();
+        });
+        gl.closePath();
+        gl.restore();*/
+      }
+    });
+  };
+
+
+
+
+
 
   var Chart = function(canvas) {
     var chart = this,
@@ -182,25 +645,6 @@
 
   var defaults = {
     line: {
-      scale: {
-        overlay: false,
-        override: false,
-        steps: null,
-        stepWidth: null,
-        startValue: null,
-        lineColor: 'rgba(0, 0, 0, 0.1)',
-        lineWidth: 1,
-        showLabels: true,
-        label: '<%=value%>',
-        fontFamily: 'Arial',
-        fontSize: 12,
-        fontStyle: 'normal',
-        fontColor: '#666',
-        showGridLines: true,
-        gridLineColor: 'rgba(0, 0, 0, .05)',
-        gridLineWidth: 1,
-      },
-
       bezierCurve: true,
       pointDot: true,
       pointDotRadius: 4,
@@ -217,15 +661,27 @@
     }
   };
 
-  var Scale = function(options) {
-    this.size = options.size;
-    this.config = options.config;
-    this.series = options.series;
-    this.offset = options.offset;
-    this.stacked = options.stacked;
+  var AxisProto = {
+    setSize: function(size) {
+      this.size = size;
+      this.scaleHop = floor(size / this.steps);
+    },
+    calculatePoint: function(val) {
+      var outerValue = this.steps * this.stepValue,
+        adjustedValue = val - this.graphMin,
+        scalingFactor = capValue(adjustedValue / outerValue, 1, 0);
+
+      return (this.scaleHop * this.steps) * scalingFactor;
+    }
   };
 
-  Scale.prototype = {};
+  var Scale = function(options) {
+    //this.categories = options.categories;
+    this.config = options.config;
+    this.series = options.series;
+  };
+
+  Scale.prototype = Object.create(AxisProto);
 
   Scale.prototype.calculateMetrics = function() {
     var maxValue = 0,
@@ -241,7 +697,8 @@
       minArr = [], // 0 for value from 0
       maxArr = [],
       arrVal,
-      stacked = this.stacked,
+      config = this.config,
+      stacked = config.stacked,
       i,
       j;
 
@@ -261,7 +718,7 @@
         }
 
         arrVal = maxArr[j];
-        isFinite(arrVal) || (arrVal = stacked ? 0 : Number.MIN_VALUE);
+        isFinite(arrVal) || (arrVal = stacked ? 0 : -Number.MAX_VALUE);
 
         if (stacked) {
           if (dataVal < 0) {
@@ -276,7 +733,7 @@
     }
 
     maxValue = max.apply(null, maxArr);
-    minValue = stacked ? 0 : min.apply(null, minArr);
+    minValue = stacked || config.startAtZero ? 0 : min.apply(null, minArr);
     
     /*maxSteps = floor(this.size / (labelHeight * 0.66)),
     minSteps =  floor(this.size / labelHeight * 0.5);*/
@@ -290,13 +747,18 @@
       rangeOrderOfMagnitude;
     
     valueRange = maxValue - minValue;
+
+    graphMin = minValue;
+    graphMax = maxValue;
+    numberOfSteps = 10;
+    stepValue = floor(valueRange / numberOfSteps);
     
-    rangeOrderOfMagnitude = calculateOrderOfMagnitude(valueRange);
+    /*rangeOrderOfMagnitude = calculateOrderOfMagnitude(valueRange);
     stepValue = pow(10, rangeOrderOfMagnitude);
     graphMin = floor(minValue / stepValue) * stepValue;
     graphMax = ceil(maxValue / stepValue) * stepValue;
     graphRange = graphMax - graphMin;
-    numberOfSteps = round(graphRange / stepValue);
+    numberOfSteps = round(graphRange / stepValue);*/
 
     // Compare number of steps to the max and min for that size graph,
     // and add in half steps if need be.
@@ -314,77 +776,300 @@
     this.steps = numberOfSteps;
     this.stepValue = stepValue;
     this.graphMin = graphMin;
+    this.graphMax = graphMax;
+    this.minValue = minValue;
+    this.maxValue = maxValue;
   };
 
-  Scale.prototype.setSize = function(size) {
-    this.size = size;
-    this.scaleHop = floor(size / this.steps);
+  Scale.prototype.generateLabels = function(template) {
+    var labels = [],
+      numberOfSteps = this.steps,
+      graphMin = this.graphMin,
+      stepValue = this.stepValue,
+      val,
+      i;
+
+    for (i = 0; i < numberOfSteps + 1; i++) {
+      val = (graphMin + (stepValue * i))
+        .toFixed(getDecimalPlaces(stepValue));
+      labels.push(
+        template ? tmpl(template, {
+          value: val
+        }) : val
+      );
+    }
+
+    this.labels = labels;
   };
 
-  Scale.prototype.calculatePoint = function(val) {
-    var outerValue = this.steps * this.stepValue,
-      adjustedValue = val - this.graphMin,
-      scalingFactor = capValue(adjustedValue / outerValue, 1, 0);
-
-    return (this.scaleHop * this.steps) * scalingFactor;
+  var Timeline = function(options) {
+    this.categories = options.categories;
+    this.series = options.series;
+    this.config = options.config;
   };
 
-  var Plot = function(options) {
-    this.xScale = options.xScale;
-    this.yScale = options.yScale;
-    this.charts = options.charts;
+  Timeline.prototype = Object.create(AxisProto);
+  Timeline.prototype.calculateMetrics = function() {
+    var categories = this.categories,
+      series = this.series,
+      minValue = 0,
+      maxValue = categories.length - 1,
+      numberOfSteps = maxValue,
+      valueRange = maxValue,
+      stepValue = /*floor(valueRange / numberOfSteps)*/ 1,
+      graphMin = minValue,
+      graphMax = maxValue;
+
+    this.steps = numberOfSteps;
+    this.stepValue = stepValue;
+    this.graphMin = graphMin;
+    this.graphMax = graphMax;
+    this.minValue = minValue;
+    this.maxValue = maxValue;
+  };
+
+  Timeline.prototype.generateLabels = function() {
+    this.labels = this.categories.concat();
+  };
+
+  window.Plot = function(canvas) {
+    this.charts = [];
+    this.series = [];
+    this.seriesMap = {};
+    this.config = defaults.line;
+    this.context = canvas.getContext('2d');
+    this.width = canvas.width;
+    this.height = canvas.height;
+    this.xConfig = axesDefaults.x;
+    this.yConfig = axesDefaults.y;
   };
 
   Plot.prototype = {
+    addSerie: function(serie) {
+      if (!serie.name) {
+        serie.name = 'serie' + Date.now();
+      }
+
+      this.series.push(serie);
+      this.seriesMap[serie.name] = serie;
+    },
     setAxes: function(axes) {
-      var x = axes.x[0],
-        y = axes.y[0],
-        series = this.series;
+      this.xConfig = mergeChartConfig(axesDefaults.x, axes.x);
+      this.yConfig = mergeChartConfig(axesDefaults.y, axes.y);
+    },
+    updateAxes: function() {
+      var series = this.series,
+        x = this.xConfig,
+        y = this.yConfig;
 
-      var scaleData = series.map(function(serie) {
-        return serie.data.map(function(val, i) {
-          if (isFinite(val)) {
-            return val;
-          }
-
-          if (isArray(val)) {
-            return val[1];
-          }
-
-          if (typeof val === 'object' && isFinite(val.y)) {
-            return val.y;
-          }
-
-          if (y.labels) {
-            return i;
-          }
-
-          return null;
-        });
+      var yData = series.map(function(serie) {
+        return serie.y;
       }),
-      timelineData = data.series.map(function(serie) {
-        return serie.data.map(function(val, i) {
-          if (isArray(val)) {
-            return val[0];
-          }
-
-          if (typeof val === 'object' && isFinite(val.x)) {
-            return val.x;
-          }
-
-          return i;
-        });
+      xData = series.map(function(serie) {
+        return serie.x;
       });
 
-      var xScale = new Scale({
-        series: timelineData,
-        labels: x.labels
+      var xAxis = new (x.labels ? Timeline : Scale)({
+        series: xData,
+        categories: x.labels,
+        config: x
       }),
-      yScale = new Scale({
-        series: scaleData,
-        labels: y.labels
+      yAxis = new (y.labels ? Timeline : Scale)({
+        series: yData,
+        categories: y.labels,
+        config: y
       });
 
+      this.xAxis = xAxis;
+      this.yAxis = yAxis;
+
+      xAxis.calculateMetrics();
+      xAxis.generateLabels(x.labelsTemplate);
+
+      yAxis.calculateMetrics();
+      yAxis.generateLabels(y.labelsTemplate);
+
+      this.prepareLabels();
+    },
+    prepareLabels: function() {
+      var self = this,
+        config = this.config,
+        gl = this.context,
+        height = this.height,
+        width = this.width,
+        xAxis = this.xAxis,
+        yAxis = this.yAxis;
+
+      // calc x axis labels
+      (function() {
+        var ySize = height,
+          widestLabelSize = calcLabelsSize(xAxis, gl),
+          rotateLabels,
+          len = xAxis.labels.length;
+
+        if (width / len < widestLabelSize) {
+          rotateLabels = 45;
+
+          if (width / len < cos(rotateLabels) * widestLabelSize) {
+            rotateLabels = 90;
+            ySize -= widestLabelSize;
+            ySize -= 10;
+          } else {
+            ySize -= sin(rotateLabels) * widestLabelSize;
+            ySize -= 5;
+          }
+        } else {
+          ySize -= xAxis.config.fontSize;
+        }
+
+        // Add a little padding between the x line and the text
+        ySize -= xAxis.config.fontSize + 10;
+
+        self.rotateXLabels = rotateLabels;
+        yAxis.setSize(ySize);
+        yAxis.offset = ySize + /*config.scale.fontSize / 2*/ 10;
+      }());
+
+      // calc y axis labels
+      (function() {
+        var widestLabelSize = calcLabelsSize(yAxis, gl),
+          xSize = width - widestLabelSize - AXIS_LEFT_PADDING * 2;
+
+        xAxis.setSize(xSize);
+        xAxis.offset = width - AXIS_LEFT_PADDING - xSize;
+      }());
+    },
+    drawScale: function() {
+      var xAxis = this.xAxis,
+        yAxis = this.yAxis,
+        config = this.config,
+        rotateXLabels = this.rotateXLabels,
+        gl = this.context,
+        width = this.width,
+        height = this.height;
+
+      // X axis line
+
+      gl.font = xAxis.config.fontStyle + ' ' +
+        xAxis.config.fontSize + 'px ' + xAxis.config.fontFamily;
+
+      gl.lineWidth = xAxis.config.lineWidth;
+      gl.strokeStyle = xAxis.config.lineColor;
+      gl.beginPath();
+      gl.moveTo(width - AXIS_LEFT_PADDING + 5, yAxis.offset);
+      gl.lineTo(width - AXIS_LEFT_PADDING - xAxis.size - 5, yAxis.offset);
+      gl.stroke();
+      
+      if (rotateXLabels > 0) {
+        gl.textAlign = 'right';
+      } else {
+        gl.textAlign = 'center';
+      }
+
+      gl.fillStyle = xAxis.config.fontColor;
+
+      var i = 0,
+        xLabels = xAxis.labels,
+        xSteps = xAxis.steps;
+
+      for (; i < xSteps + 1; i++) {
+        gl.save();
+
+        if (rotateXLabels > 0) {
+          gl.translate(
+            xAxis.offset + i * xAxis.scaleHop,
+            yAxis.offset + xAxis.config.fontSize
+          );
+
+          gl.rotate(-rotateLabels * (Math.PI / 180));
+          gl.fillText(xLabels[i], 0, 0);
+          // moved from here
+        } else {
+          if (i && i !== xSteps) {
+            gl.textAlign = 'center';
+          } else {
+            gl.textAlign = i ? 'end' : 'start';
+          }
+
+          gl.fillText(
+            xLabels[i],
+            xAxis.offset + i * xAxis.scaleHop,
+            yAxis.offset + xAxis.config.fontSize + 3
+          );
+        }
+
+        gl.restore(); // moved from ^
+
+        gl.beginPath();
+        gl.moveTo(xAxis.offset + i * xAxis.scaleHop, yAxis.offset + 3);
+        
+        // Check i isnt 0, so we dont go over the Y axis twice.
+        if (xAxis.config.showGridLines && i > 0) {
+          gl.lineWidth = xAxis.config.gridLineWidth;
+          gl.strokeStyle = xAxis.config.gridLineColor;
+          gl.lineTo(xAxis.offset + i * xAxis.scaleHop, 5);
+        } else {
+          gl.lineTo(xAxis.offset + i * xAxis.scaleHop, yAxis.offset + 3);
+        }
+
+        gl.stroke();
+      }
+      
+      // Y axis
+
+      gl.font = yAxis.config.fontStyle + ' ' +
+        yAxis.config.fontSize + 'px ' + yAxis.config.fontFamily;
+
+      gl.lineWidth = yAxis.config.lineWidth;
+      gl.strokeStyle = yAxis.config.lineColor;
+      gl.beginPath();
+      gl.moveTo(xAxis.offset, yAxis.offset + 5);
+      gl.lineTo(xAxis.offset, 5);
+      gl.stroke();
+      
+      gl.textAlign = 'right';
+      gl.textBaseline = 'middle';
+
+      var j = 0,
+        ySteps = yAxis.steps,
+        yLabels = yAxis.labels;
+
+      for (; j < ySteps + 1; j++) {
+        gl.beginPath();
+
+        gl.moveTo(xAxis.offset - 3, yAxis.offset - (j + 1) * yAxis.scaleHop);
+
+        if (yAxis.config.showGridLines) {
+          gl.lineWidth = yAxis.config.gridLineWidth;
+          gl.strokeStyle = yAxis.config.gridLineColor;
+          gl.lineTo(xAxis.offset + xAxis.size + 5, yAxis.offset - (j + 1) * yAxis.scaleHop);
+        } else {
+          gl.lineTo(xAxis.offset - 0.5, yAxis.offset - (j + 1) * yAxis.scaleHop);
+        }
+        
+        gl.stroke();
+        
+        if (yAxis.config.showLabels) {
+          gl.fillText(yLabels[j], xAxis.offset - 8, yAxis.offset - j * yAxis.scaleHop);
+        }
+      }
+    },
+    create: function(type, data, options) {
+      type = type.toLowerCase();
+      options = mergeChartConfig(defaults[type], options);
+      type = new plotCharts[type](data, options, this);
+
+      this.charts.push(type);
+
+      return type;
+    },
+    render: function() {
+      this.updateAxes();
+      this.drawScale();
+
+      this.charts.forEach(function(chart) {
+        chart.draw();
+      });
     }
   };
 
@@ -402,10 +1087,7 @@
     var gl = chart.context,
       width = chart.width,
       height = chart.height,
-      stacked = config.area === 'stacked',
-      rotateLabels;
-
-    var AXIS_LEFT_PADDING = 20;
+      stacked = config.area === 'stacked';
 
     var drawLines = function(animPc) {
       var i = 0,
@@ -435,7 +1117,7 @@
         gl.lineWidth = config.datasetStrokeWidth;
         gl.beginPath();
         gl.moveTo(
-          xScale.offset,  
+          xScale.offset,
           /*yScale.offset -
             animPc * yScale.calculatePoint(itemData[0])*/
           yPos(0)
@@ -704,226 +1386,9 @@
       });
       gl.closePath();
       gl.restore();*/
-    },
-    drawScale = function() {
-      // X axis line
-
-      gl.lineWidth = config.scale.lineWidth;
-      gl.strokeStyle = config.scale.lineColor;
-      gl.beginPath();
-      gl.moveTo(width - AXIS_LEFT_PADDING + 5, yScale.offset);
-      gl.lineTo(width - AXIS_LEFT_PADDING - xScale.size - 5, yScale.offset);
-      gl.stroke();
-      
-      if (rotateLabels > 0) {
-        gl.save();
-        gl.textAlign = 'right';
-      } else {
-        gl.textAlign = 'center';
-      }
-
-      gl.fillStyle = config.scale.fontColor;
-
-      var i = 0,
-        labels = data.labels,
-        labelsLen = labels.length;
-
-      for (; i < labelsLen; i++) {
-        gl.save();
-
-        if (rotateLabels > 0) {
-          gl.translate(
-            xScale.offset + i * valueHop,
-            yScale.offset + config.scale.fontSize
-          );
-
-          gl.rotate(-rotateLabels * (Math.PI / 180));
-          gl.fillText(labels[i], 0, 0);
-          // moved from here
-        } else {
-          if (i && i !== labelsLen - 1) {
-            gl.textAlign = 'center';
-          } else {
-            gl.textAlign = i ? 'end' : 'start';
-          }
-
-          gl.fillText(
-            labels[i],
-            xScale.offset + i * valueHop,
-            yScale.offset + config.scale.fontSize + 3
-          );
-        }
-
-        gl.restore(); // moved from ^
-
-        gl.beginPath();
-        gl.moveTo(xScale.offset + i * valueHop, yScale.offset + 3);
-        
-        // Check i isnt 0, so we dont go over the Y axis twice.
-        if (config.scale.showGridLines && i > 0) {
-          gl.lineWidth = config.scale.gridLineWidth;
-          gl.strokeStyle = config.scale.gridLineColor;
-          gl.lineTo(xScale.offset + i * valueHop, 5);
-        } else {
-          gl.lineTo(xScale.offset + i * valueHop, yScale.offset + 3);
-        }
-
-        gl.stroke();
-      }
-      
-      // Y axis
-
-      gl.lineWidth = config.scale.lineWidth;
-      gl.strokeStyle = config.scale.lineColor;
-      gl.beginPath();
-      gl.moveTo(xScale.offset, yScale.offset + 5);
-      gl.lineTo(xScale.offset, 5);
-      gl.stroke();
-      
-      gl.textAlign = 'right';
-      gl.textBaseline = 'middle';
-
-      var j = 0,
-        steps = yScale.steps;
-
-      for (; j < steps + 1; j++) {
-        gl.beginPath();
-
-        gl.moveTo(xScale.offset - 3, yScale.offset - (j + 1) * yScale.scaleHop);
-
-        if (config.scale.showGridLines) {
-          gl.lineWidth = config.scale.gridLineWidth;
-          gl.strokeStyle = config.scale.gridLineColor;
-          gl.lineTo(xScale.offset + xScale.size + 5, yScale.offset - (j + 1) * yScale.scaleHop);
-        } else {
-          gl.lineTo(xScale.offset - 0.5, yScale.offset - (j + 1) * yScale.scaleHop);
-        }
-        
-        gl.stroke();
-        
-        if (config.scale.showLabels) {
-          gl.fillText(calculatedLabels[j], xScale.offset - 8, yScale.offset - j * yScale.scaleHop);
-        }
-      }
     };
 
-    var yData = data.series.map(function(serie) {
-      return serie.data;
-    }),
-    xData = data.series.map(function(serie) {
-      return serie.data.map(function(val, i) {
-        return i;
-      });
-    });
-
-    var yScale,
-      xScale;
-
-    (function() {
-      var maxSize = height;
-
-      // Need to check the X axis first - measure the length of each text metric,
-      // and figure out if we need to rotate by 45 degrees.
-      gl.font = config.scale.fontStyle + ' ' +
-        config.scale.fontSize + 'px ' + config.scale.fontFamily;
-
-      var widestXLabel = 0;
-
-      var i = 0,
-        labels = data.labels,
-        len = labels.length,
-        textLength;
-
-      for (; i < len; i++){
-        textLength = gl.measureText(labels[i]).width;
-
-        // If the text length is longer - make that equal to longest text!
-        widestXLabel = (textLength > widestXLabel) ? textLength : widestXLabel;
-      }
-
-      if (width / len < widestXLabel) {
-        rotateLabels = 45;
-
-        if (width / len < cos(rotateLabels) * widestXLabel) {
-          rotateLabels = 90;
-          maxSize -= widestXLabel;
-          maxSize -= 10;
-        } else {
-          maxSize -= sin(rotateLabels) * widestXLabel;
-          maxSize -= 5;
-        }
-      } else {
-        maxSize -= config.scale.fontSize;
-      }
-
-      // Add a little padding between the x line and the text
-      maxSize -= config.scale.fontSize + 10;
-
-      // Set 5 pixels greater than the font size to allow for a little padding from the X axis.
-      // Then get the area above we can safely draw on.
-
-      yScale = new Scale({
-        series: yData,
-        offset: maxSize + /*config.scale.fontSize / 2*/ 10,
-        stacked: stacked
-      });
-
-      yScale.calculateMetrics();
-      yScale.setSize(maxSize);
-    }());
-
-    var valueHop,
-      calculatedLabels = populateLabels(yScale, config.scale.label);
-
-    (function() {
-      var longestText = 0;
-
-      // if we are showing the labels
-      if (config.scale.showLabels) {
-        gl.font = config.scale.fontStyle + ' ' +
-          config.scale.fontSize + 'px ' + config.scale.fontFamily;
-
-        var i = 0,
-          labels = calculatedLabels,
-          len = labels.length
-          measuredText;
-
-        for (; i < len; i++) {
-          var measuredText = gl.measureText(labels[i]).width;
-
-          longestText = (measuredText > longestText) ?
-            measuredText : longestText;
-        }
-      }
-
-      // Add a little extra padding from the y axis
-      // longestText += 10;
-
-      console.log('longestText', longestText);
-
-      var xSize = width - longestText - AXIS_LEFT_PADDING * 2;
-
-      valueHop = floor(xSize / (data.labels.length - 1));
-        
-      // in x
-      // yAxisPosX = width - widestXLabel / 2 - xSize;
-
-      // in y
-      // xAxisPosY = scaleHeight + config.scale.fontSize / 2;
-
-      xScale = new Scale({
-        series: xData,
-        offset: width - AXIS_LEFT_PADDING - xSize
-      });
-
-      xScale.calculateMetrics();
-      xScale.setSize(xSize);
-      console.log('value hop:', valueHop);
-    }());
-
-    console.log(xScale, yScale);
-
-    animationLoop(config, drawScale, stacked ? drawStackedLines : drawLines, chart);
+    //animationLoop(config, drawScale, stacked ? drawStackedLines : drawLines, chart);
   };
 
   window.Chart = Chart;
